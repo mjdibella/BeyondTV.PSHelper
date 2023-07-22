@@ -20,7 +20,6 @@ function Connect-BTV {
         [Parameter(Mandatory=$false)][string]$apiUser = 'BeyondTV.PSHelper',
         [Parameter(Mandatory=$false)][string]$apiPassword,
         [Parameter(Mandatory=$false)][string]$expiry = 15
-
     )
     $beyondTV.serverURL = $serverURL
     $beyondTV.licenseKey = $licenseKey
