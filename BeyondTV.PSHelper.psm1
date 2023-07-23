@@ -112,13 +112,18 @@ function Start-BTVGuideUpdate {
 function Get-BTVGuideStatus {
     $uri = $beyondTV.serverURL + "/BTVGuideUpdater.asmx"
     $btvGuideUpdater = New-WebServiceProxy -Uri $uri
+    $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
+    $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
     $state =''
     $message = ''
     $progressResult = $btvGuideUpdater.GetProgress($ticket, [ref]$state, [ref]$message)
-    $lastAttemptUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastAttemptedUpdate($ticket))
-    $lastSuccessfulUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastSuccessfulUpdate($ticket))
-    $nextAttemptedUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetNextAttemptedUpdate($ticket))
+    $lastAttemptUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastAttemptedUpdate($ticket)).ToLocalTime()
+    $lastSuccessfulUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastSuccessfulUpdate($ticket)).ToLocalTime()
+    $nextAttemptedUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetNextAttemptedUpdate($ticket)).ToLocalTime()
+    $guideDataExtents = ''
+    $btvGuideData.GetDataExtents($ticket,[ref]$guideDataExtents)
+    $guideDataExtents = [datetime]::FromFileTimeUtc($guideDataExtents).ToLocalTime()
     $btvGuideProgress = New-Object PSObject
     $btvGuideProgress | Add-member -NotePropertyName 'GuideUpdaterResult' -NotePropertyValue $progressResult
     $btvGuideProgress | Add-member -NotePropertyName 'GuideUpdaterState' -NotePropertyValue $state
@@ -126,6 +131,7 @@ function Get-BTVGuideStatus {
     $btvGuideProgress | Add-member -NotePropertyName 'LastAttemptUpdate' -NotePropertyValue $lastAttemptUpdate
     $btvGuideProgress | Add-member -NotePropertyName 'LastSuccessfulUpdate' -NotePropertyValue $lastSuccessfulUpdate
     $btvGuideProgress | Add-member -NotePropertyName 'NextAttemptedUpdate' -NotePropertyValue $nextAttemptedUpdate
+    $btvGuideProgress | Add-member -NotePropertyName 'GuideDataExtents' -NotePropertyValue $guideDataExtents
     $btvGuideProgress
 }
 
@@ -141,7 +147,34 @@ function Get-BTVUpcomingRecordings {
         }
         $recording
     }
-}    
+}
+
+function Get-BTVRejectedRecordings {
+    $uri = $beyondTV.serverURL + "/BTVScheduler.asmx"
+    $BTVScheduler = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $recordings = $BTVScheduler.GetRejectedRecordings($ticket)
+    foreach ($recordingBag in $recordings) {
+        $recording = New-Object PSObject
+        foreach ($property in $recordingBag.properties) {
+            $recording | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $recording
+    }
+}
+
+function New-BTVLogEntry {
+    param(
+        [Parameter(Mandatory=$true)][int]$errorCode,
+        [Parameter(Mandatory=$false)][int]$unique = 1,
+        [Parameter(Mandatory=$false)][int]$uniqueDesc = 1,
+        [Parameter(Mandatory=$true)][string]$errorDescription
+    )
+    $uri = $beyondTV.serverURL + "/BTVLog.asmx"
+    $BTVLog = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $BTVLog.LogError($ticket,$errorCode,$unique,$uniqueDesc,$errorDescription)
+}        
 
 $beyondTV = [ordered]@{
     registryURL = "HKCU:\Software\Snapstream\BeyondTV.PSHelper"
