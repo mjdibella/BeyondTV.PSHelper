@@ -35,24 +35,29 @@ function Connect-BTV {
     }
     New-ItemProperty -Path $beyondTV.registryURL -Name apiUser -Value $apiUser | Out-Null
     New-ItemProperty -Path $beyondTV.registryURL -Name expiry -Value $expiry | Out-Null
-
-    #Get-BTVAuthTicket | Out-Null
+    Get-BTVAuthTicket | Out-Null
     write-host "Connected to BeyondTV server at $($beyondTV.serverURL)`n"
 }
 
 function Disconnect-BTV {
-    Remove-ItemProperty -Path $beyondTV.registryURL -Name apiUser -ErrorAction SilentlyContinue | Out-Null
-    Remove-ItemProperty -Path $beyondTV.registryURL -Name apiPassword -ErrorAction SilentlyContinue | Out-Null
-    Remove-ItemProperty -Path $beyondTV.registryURL -Name AuthTicket -ErrorAction SilentlyContinue | Out-Null
-    Remove-ItemProperty -Path $beyondTV.registryURL -Name Expires -ErrorAction SilentlyContinue | Out-Null
-    Remove-ItemProperty -Path $beyondTV.registryURL -Name expiry -ErrorAction SilentlyContinue | Out-Null
-    Remove-ItemProperty -Path $beyondTV.registryURL -Name serverURL -ErrorAction SilentlyContinue | Out-Null
-    $beyondTV.serverURL = $null
-    $beyondTV.apiPassword = $null
-    $beyondTV.apiUser = $null
-    $beyondTV.AuthTicket = $null
-    $beyondTV.Expires = $null
-    $beyondTV.expiry = $null
+    if ($beyondTV.authTicket) {
+        $uri = $beyondTV.serverURL + "/BTVLicenseManager.asmx"
+        $btvLicenseManager = New-WebServiceProxy -Uri $uri
+        $ticket = Get-BTVAuthTicket
+        Remove-ItemProperty -Path $beyondTV.registryURL -Name apiUser -ErrorAction SilentlyContinue | Out-Null
+        Remove-ItemProperty -Path $beyondTV.registryURL -Name apiPassword -ErrorAction SilentlyContinue | Out-Null
+        Remove-ItemProperty -Path $beyondTV.registryURL -Name AuthTicket -ErrorAction SilentlyContinue | Out-Null
+        Remove-ItemProperty -Path $beyondTV.registryURL -Name Expires -ErrorAction SilentlyContinue | Out-Null
+        Remove-ItemProperty -Path $beyondTV.registryURL -Name expiry -ErrorAction SilentlyContinue | Out-Null
+        Remove-ItemProperty -Path $beyondTV.registryURL -Name serverURL -ErrorAction SilentlyContinue | Out-Null
+        $beyondTV.serverURL = $null
+        $beyondTV.apiPassword = $null
+        $beyondTV.apiUser = $null
+        $beyondTV.AuthTicket = $null
+        $beyondTV.Expires = $null
+        $beyondTV.expiry = $null
+        $btvLicenseManager.Logoff($ticket)
+    }
 }
 
 function Get-BTVAuthTicket {
@@ -62,7 +67,9 @@ function Get-BTVAuthTicket {
     $uri = $beyondTV.serverURL + "/BTVLicenseManager.asmx"
     $btvLicenseManager = New-WebServiceProxy -Uri $uri
     if ([DateTime]$beyondTV.expires -lt [DateTime]::Now.AddMinutes(1)) {
-        $beyondTv.authTicket = ($btvLicenseManager.Logon($beyondTV.licenseKey,$beyondTV.apiUser,$beyondTV.apiPassword).Properties | where {$_.Name -eq 'AuthTicket'}).Value
+        $btvLogonProperties = $btvLicenseManager.Logon($beyondTV.licenseKey,$beyondTV.apiUser,$beyondTV.apiPassword)
+
+        $beyondTv.authTicket = ($btvLogonProperties.properties | where {$_.Name -eq 'AuthTicket'}).Value
         Set-ItemProperty -Path $beyondTV.registryURL -Name AuthTicket -Value $beyondTV.authTicket | Out-Null
         $beyondTV.expires = [DateTime]::Now.AddMinutes($beyondTV.expiry)
     } elseif ([DateTime]$beyondTV.expires -lt [DateTime]::Now.AddMinutes($beyondTV.expiry / 2)) {
@@ -107,6 +114,30 @@ function Start-BTVGuideUpdate {
     $ticket = Get-BTVAuthTicket
     $btvGuideUpdater.SetProperty($ticket,'UpdateType','Clean') | Out-null
     $btvGuideUpdater.StartUpdate($ticket)
+}
+
+function Import-BTVRemoteRecordings {
+    $uri = $beyondTV.serverURL + "/BTVGuideUpdater.asmx"
+    $btvGuideUpdater = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $btvGuideUpdater.GetRemoteRecordings($ticket)
+}
+
+function Get-BTVGuideCatagories {
+    param(
+        [Parameter(Mandatory=$false)][string]$subcatagory = ''
+    )
+    $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
+    $btvGuideData = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $catagories = $btvGuideData.GetCategories($ticket,$subcatagory)
+    foreach ($catagoryBag in $catagories) {
+         $catagory = New-Object PSObject
+         foreach ($property in $catagoryBag.properties) {
+            $catagory | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+         }
+         $catagory
+    }
 }
 
 function Get-BTVGuideStatus {
@@ -163,6 +194,20 @@ function Get-BTVRejectedRecordings {
     }
 }
 
+function Get-BTVRecordings {
+    $uri = $beyondTV.serverURL + "/BTVLibrary.asmx"
+    $BTVLibrary = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $recordings = $BTVLibrary.FlatViewByDate($ticket)
+    foreach ($recordingBag in $recordings) {
+        $recording = New-Object PSObject
+        foreach ($property in $recordingBag.properties) {
+            $recording | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $recording
+    }
+}
+
 function New-BTVLogEntry {
     param(
         [Parameter(Mandatory=$true)][int]$errorCode,
@@ -174,7 +219,11 @@ function New-BTVLogEntry {
     $BTVLog = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
     $BTVLog.LogError($ticket,$errorCode,$unique,$uniqueDesc,$errorDescription)
-}        
+}
+
+function Get-BTVCommands {
+    (Get-Command | where {$_.ModuleName -eq 'beyondTV.PSHelper'}).Name
+}
 
 $beyondTV = [ordered]@{
     registryURL = "HKCU:\Software\Snapstream\BeyondTV.PSHelper"
