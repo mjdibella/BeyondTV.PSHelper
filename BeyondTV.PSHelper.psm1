@@ -194,6 +194,56 @@ function Get-BTVRejectedRecordings {
     }
 }
 
+function Get-BTVSeries {
+    $uri = $beyondTV.serverURL + "/BTVLibrary.asmx"
+    $BTVLibrary = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $allSeries = $BTVLibrary.GetSeries($ticket)
+    foreach ($seriesBag in $allSeries) {
+        
+        $series = New-Object PSObject
+        foreach ($property in $seriesBag.properties) {
+           $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $series
+    }
+}
+
+function Find-BTVEpisodesByKeyword {
+    param(
+        [Parameter(Mandatory=$true)][string]$keywords
+    )
+    $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
+    $btvGuideData = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $episodes = $btvGuideData.GetEpisodesByKeyword($ticket,$keywords)
+    foreach ($episodeBag in $episodes) {
+        $episode = New-Object PSObject
+        foreach ($property in $episodeBag.properties) {
+            $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $episode
+    }
+}
+    
+
+function Get-BTVFolders {
+    param(
+        [Parameter(Mandatory=$false)][string]$folder = ''
+    )
+    $uri = $beyondTV.serverURL + "/BTVLibrary.asmx"
+    $btvLibrary = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $folders = $btvLibrary.GetFolders($ticket,$folder)
+    foreach ($folderBag in $folders) {
+        $btvFolder = New-Object PSObject
+        foreach ($property in $folderBag.properties) {
+            $btvFolder | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $btvFolder
+    }
+}
+
 function Get-BTVRecordings {
     $uri = $beyondTV.serverURL + "/BTVLibrary.asmx"
     $BTVLibrary = New-WebServiceProxy -Uri $uri
