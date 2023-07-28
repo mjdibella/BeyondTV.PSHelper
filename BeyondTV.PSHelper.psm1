@@ -147,7 +147,7 @@ function Get-BTVGuideCatagories {
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
-    $catagories = $btvGuideData.GetCategories($ticket,topCatagory)
+    $catagories = $btvGuideData.GetCategories($ticket,$topCatagory)
     foreach ($catagoryBag in $catagories) {
          $catagory = New-Object PSObject
          foreach ($property in $catagoryBag.properties) {
@@ -170,7 +170,7 @@ function Get-BTVGuideStatus {
     $lastSuccessfulUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastSuccessfulUpdate($ticket)).ToLocalTime()
     $nextAttemptedUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetNextAttemptedUpdate($ticket)).ToLocalTime()
     $guideDataExtents = ''
-    $btvGuideData.GetDataExtents($ticket,[ref]$guideDataExtents)
+    $btvGuideData.GetDataExtents($ticket,[ref]$guideDataExtents) | Out-Null
     $guideDataExtents = [datetime]::FromFileTimeUtc($guideDataExtents).ToLocalTime()
     $btvGuideProgress = New-Object PSObject
     $btvGuideProgress | Add-member -NotePropertyName 'GuideUpdaterResult' -NotePropertyValue $progressResult
