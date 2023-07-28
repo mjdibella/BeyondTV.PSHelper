@@ -142,12 +142,12 @@ function Import-BTVRemoteRecordings {
 
 function Get-BTVGuideCatagories {
     param(
-        [Parameter(Mandatory=$false)][string]$subcatagory = ''
+        [Parameter(Mandatory=$false)][string]$topCatagory = ''
     )
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
-    $catagories = $btvGuideData.GetCategories($ticket,$subcatagory)
+    $catagories = $btvGuideData.GetCategories($ticket,topCatagory)
     foreach ($catagoryBag in $catagories) {
          $catagory = New-Object PSObject
          foreach ($property in $catagoryBag.properties) {
@@ -277,7 +277,7 @@ function Find-BTVEpisodesByStation {
 function Find-BTVSeriesByCatagory {
     param(
         [Parameter(Mandatory=$true)][string]$catagory,
-        [Parameter(Mandatory=$false)][string]$subCatagory =''
+        [Parameter(Mandatory=$true)][string]$subCatagory
     )
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
