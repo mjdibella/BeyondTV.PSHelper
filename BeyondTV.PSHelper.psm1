@@ -166,7 +166,7 @@ function Get-BTVGuideStatus {
     $state =''
     $message = ''
     $progressResult = $btvGuideUpdater.GetProgress($ticket, [ref]$state, [ref]$message)
-    $lastAttemptUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastAttemptedUpdate($ticket)).ToLocalTime()
+    $lastAttemptedUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastAttemptedUpdate($ticket)).ToLocalTime()
     $lastSuccessfulUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetLastSuccessfulUpdate($ticket)).ToLocalTime()
     $nextAttemptedUpdate = [datetime]::FromFileTimeUtc($btvGuideUpdater.GetNextAttemptedUpdate($ticket)).ToLocalTime()
     $guideDataExtents = ''
@@ -176,7 +176,7 @@ function Get-BTVGuideStatus {
     $btvGuideProgress | Add-member -NotePropertyName 'GuideUpdaterResult' -NotePropertyValue $progressResult
     $btvGuideProgress | Add-member -NotePropertyName 'GuideUpdaterState' -NotePropertyValue $state
     $btvGuideProgress | Add-member -NotePropertyName 'GuideUpdaterMessage' -NotePropertyValue $message
-    $btvGuideProgress | Add-member -NotePropertyName 'LastAttemptUpdate' -NotePropertyValue $lastAttemptUpdate
+    $btvGuideProgress | Add-member -NotePropertyName 'LastAttemptedUpdate' -NotePropertyValue $lastAttemptedUpdate
     $btvGuideProgress | Add-member -NotePropertyName 'LastSuccessfulUpdate' -NotePropertyValue $lastSuccessfulUpdate
     $btvGuideProgress | Add-member -NotePropertyName 'NextAttemptedUpdate' -NotePropertyValue $nextAttemptedUpdate
     $btvGuideProgress | Add-member -NotePropertyName 'GuideDataExtents' -NotePropertyValue $guideDataExtents
@@ -222,6 +222,20 @@ function Get-BTVActiveRecordings {
             $recording | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
         }
         $recording
+    }
+}
+
+function Get-BTVLiveTVSessions {
+    $uri = $beyondTV.serverURL + "/BTVLiveTVManager.asmx"
+    $btvDispatcher = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $sessions = $btvDispatcher.GetSessions($ticket)
+    foreach ($sessionBag in $sessions) {
+        $session = New-Object PSObject
+        foreach ($property in $sessionBag.properties) {
+            $session | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $session
     }
 }
 
@@ -355,6 +369,39 @@ function New-BTVLogEntry {
 
 function Get-BTVCommands {
     (Get-Command | where {$_.ModuleName -eq 'beyondTV.PSHelper'}).Name
+}
+
+function Get-BTVTaskListCount {
+    $uri = $beyondTV.serverURL + "/BTVBatchProcessor.asmx"
+    $BTVTaskListProcessor = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $BTVTaskListProcessor.GetCount($ticket)
+}
+
+function Get-BTVTaskLists {
+    param(
+        [Parameter(Mandatory=$false)][int]$taskIndex,
+        [Parameter(Mandatory=$false)][switch]$showHidden
+    )
+    $taskListCount = Get-BTVTaskListCount
+    if ($PSBoundParameters.ContainsKey('taskIndex') -and (($taskIndex + 1) -gt $taskListCount)) {
+        break
+    }
+    $uri = $beyondTV.serverURL + "/BTVBatchProcessor.asmx"
+    $btvTaskListProcessor = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    if ($PSBoundParameters.ContainsKey('taskIndex')) {
+        $taskListCount = $taskIndex + 1
+    } else {
+        $taskIndex = 0
+    }
+    for($taskIndex; $taskIndex -lt $taskListCount; $taskIndex++) {
+        $xmlTaskList = $btvTaskListProcessor.ItemByIndex($ticket, $taskIndex)
+        $taskList = $xmlTaskList | Select-XML -XPath '/BatchList' | Select-Object -ExpandProperty Node
+        if ($showHidden.IsPresent -or $taskList.Hidden -eq '0') {
+            $taskList
+        }
+    }
 }
 
 $beyondTV = [ordered]@{
