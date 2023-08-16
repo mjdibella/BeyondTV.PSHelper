@@ -291,18 +291,32 @@ function Find-BTVEpisodesByStation {
 function Find-BTVSeriesByCatagory {
     param(
         [Parameter(Mandatory=$true)][string]$catagory,
-        [Parameter(Mandatory=$true)][string]$subCatagory
+        [Parameter(Mandatory=$false)][string]$subCatagory
     )
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
-    $allSeries = $btvGuideData.GetSeriesByCategory($ticket,$catagory,$subCatagory)
-    foreach ($seriesBag in $allSeries) {
-        $series = New-Object PSObject
-        foreach ($property in $seriesBag.properties) {
-            $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+    if ($subCatagory.IsPresent) {
+        $allSeries = $btvGuideData.GetSeriesByCategory($ticket,$catagory,$subCatagory)
+        foreach ($seriesBag in $allSeries) {
+            $series = New-Object PSObject
+            foreach ($property in $seriesBag.properties) {
+                $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+            }
+            $series
         }
-        $series
+    } else {
+        $subCatagories = (Get-BTVGuideCatagories -topCatagory $catagory).Category | where {$_ -ne ''}
+        foreach ($subCatagory in $subCatagories) {
+            $allSeries = $btvGuideData.GetSeriesByCategory($ticket,$catagory,$subCatagory)
+            foreach ($seriesBag in $allSeries) {
+                $series = New-Object PSObject
+                foreach ($property in $seriesBag.properties) {
+                    $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+                }
+                $series
+            }
+        }
     }
 }
 
