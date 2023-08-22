@@ -35,6 +35,7 @@ function Connect-BTV {
     }
     New-ItemProperty -Path $beyondTV.registryURL -Name apiUser -Value $apiUser | Out-Null
     New-ItemProperty -Path $beyondTV.registryURL -Name expiry -Value $expiry | Out-Null
+    New-ItemProperty -Path $beyondTV.registryURL -Name licenseKey -Value $licenseKey | Out-Null
     Get-BTVAuthTicket | Out-Null
     write-host "Connected to BeyondTV server at $($beyondTV.serverURL)`n"
 }
@@ -272,19 +273,35 @@ function Find-BTVEpisodesByKeyword {
 }
 
 function Find-BTVEpisodesByStation {
+    [CmdletBinding(DefaultParameterSetName='byCallSign')]
     param(
-        [Parameter(Mandatory=$true)][string]$uniqueChannelID
+        [Parameter(Mandatory=$true,ParameterSetName='byChannelID')][string]$uniqueChannelID,
+        [Parameter(Mandatory=$true,ParameterSetName='byCallSign')][string]$stationCallSign
     )
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
-    $episodes = $btvGuideData.GetEpisodesByStation($ticket,$uniqueChannelID)
-    foreach ($episodeBag in $episodes) {
-        $episode = New-Object PSObject
-        foreach ($property in $episodeBag.properties) {
-            $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+    if ($stationCallSign) {
+        $uniqueChannelIDs = (Get-BTVUnifiedLineup | where {$_.StationCallSign -eq $stationCallSign}).UniqueChannelID  
+        foreach ($uniqueChannelID in $uniqueChannelIDs) {
+            $episodes = $btvGuideData.GetEpisodesByStation($ticket,$uniqueChannelID)
+            foreach ($episodeBag in $episodes) {
+                $episode = New-Object PSObject
+                foreach ($property in $episodeBag.properties) {
+                    $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+                }
+                $episode
+            }
         }
-        $episode
+    } else {
+        $episodes = $btvGuideData.GetEpisodesByStation($ticket,$uniqueChannelID)
+        foreach ($episodeBag in $episodes) {
+            $episode = New-Object PSObject
+            foreach ($property in $episodeBag.properties) {
+                $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+            }
+            $episode
+        }
     }
 }
 
@@ -392,6 +409,20 @@ function Get-BTVTaskListCount {
     $BTVTaskListProcessor.GetCount($ticket)
 }
 
+function Get-BTVJobs {
+    $uri = $beyondTV.serverURL + "/BTVScheduler.asmx"
+    $BTVScheduler = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $jobBags = $BTVScheduler.GetJobs($ticket)
+    foreach ($jobBag in $jobBags) {
+        $btvJob = New-Object PSObject
+        foreach ($property in $jobBag.properties) {
+            $btvJob | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+        }
+        $btvJob
+    }
+}
+
 function Get-BTVTaskLists {
     param(
         [Parameter(Mandatory=$false)][int]$taskIndex,
@@ -416,6 +447,95 @@ function Get-BTVTaskLists {
             $taskList
         }
     }
+}
+
+function New-BTVRecordingJob {
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory=$true)][string]$rules,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$uniqueChannelID,
+        [Parameter(Mandatory=$false)][string]$epgRepeat,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$epgId,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$seriesTitle,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$seriesDescription,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$episodeTitle,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$episodeDescription,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$stationNumber,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$channel,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$start,
+        [Parameter(ValueFromPipelineByPropertyName)][string]$genre,
+        [Parameter(Mandatory=$false)][string]$timeParameterHour,
+        [Parameter(Mandatory=$false)][string]$timeParameterMinute,
+        [Parameter(Mandatory=$false)][string]$timeParameterDayOfWeek,
+        [Parameter(Mandatory=$false)][string]$timeParameterMonth,
+        [Parameter(Mandatory=$false)][string]$timeParameterYear,
+        [Parameter(Mandatory=$false)][string]$timeParameterDay,
+        [Parameter(Mandatory=$false)][string]$duration = '',
+        [Parameter(Mandatory=$false)][string]$extendStart = '0',
+        [Parameter(Mandatory=$false)][string]$extendEnd = '0',
+        [Parameter(Mandatory=$false)][string]$manualRepeat,
+        [Parameter(Mandatory=$false)][string]$keyword,
+        [Parameter(Mandatory=$false)][string]$recordAnyChannel = '0'
+    )
+    $btvJob = New-Object PSObject
+    $btvJob | Add-member -NotePropertyName 'GUID' -NotePropertyValue ([guid]::NewGuid()).Guid
+    $btvJob | Add-member -NotePropertyName 'Rules' -NotePropertyValue $rules
+    if ($episodeTitle) {
+        $btvJob | Add-member -NotePropertyName 'Title' -NotePropertyValue $episodeTitle
+    } else {
+        $btvJob | Add-member -NotePropertyName 'Title' -NotePropertyValue $seriesTitle
+    }
+    $btvJob | Add-member -NotePropertyName 'DisplayTitle' -NotePropertyValue $btvJob.Title
+    $btvJob | Add-member -NotePropertyName 'SeriesTitle' -NotePropertyValue $seriesTitle
+    $btvJob | Add-member -NotePropertyName 'EpisodeTitle' -NotePropertyValue $episodeTitle
+    $btvJob | Add-member -NotePropertyName 'SeriesDescription' -NotePropertyValue $seriesDescription
+    $btvJob | Add-member -NotePropertyName 'EpisodeDescription' -NotePropertyValue $episodeDescription
+    $btvJob | Add-member -NotePropertyName 'ExtendStart' -NotePropertyValue $extendStart
+    $btvJob | Add-member -NotePropertyName 'ExtendEnd' -NotePropertyValue $extendEnd
+    $btvJob | Add-member -NotePropertyName 'Duration' -NotePropertyValue $duration
+    $btvJob | Add-member -NotePropertyName 'RecordAnyChannel' -NotePropertyValue $recordAnyChannel
+    $btvJob | Add-member -NotePropertyName 'StartDateTime' -NotePropertyValue $start
+    $btvJob | Add-member -NotePropertyName 'Genre' -NotePropertyValue $genre
+    if (($rules -eq 'EPG') -or ($rules -eq 'Keyword'))  {
+        $station = Get-BTVUnifiedLineup | where {$_.uniqueChannelID -eq $uniqueChannelID}
+        $btvJob | Add-member -NotePropertyName 'UniqueChannelID' -NotePropertyValue $uniqueChannelID
+        $btvJob | Add-member -NotePropertyName 'StationNumber' -NotePropertyValue $station.stationNumber
+        $btvJob | Add-member -NotePropertyName 'Channel' -NotePropertyValue $station.TMSChannel
+        $btvJob | Add-member -NotePropertyName 'EPGRepeat' -NotePropertyValue $epgRepeat
+        $btvJob | Add-member -NotePropertyName 'EPGID' -NotePropertyValue $epgId
+        $btvJob | Add-member -NotePropertyName 'Keyword' -NotePropertyValue $keyword
+    } elseif ($rules -eq 'Manual') {
+        $btvJob | Add-member -NotePropertyName 'TimeParameterHour' -NotePropertyValue $timeParameterHour
+        $btvJob | Add-member -NotePropertyName 'TimeParameterMinute' -NotePropertyValue $timeParameterMinute
+        $btvJob | Add-member -NotePropertyName 'TimeParameterDayOfWeek' -NotePropertyValue $timeParameterDayOfWeek
+        $btvJob | Add-member -NotePropertyName 'TimeParameterMonth' -NotePropertyValue $timeParameterMonth
+        $btvJob | Add-member -NotePropertyName 'TimeParameterYear' -NotePropertyValue $timeParameterYear
+        $btvJob | Add-member -NotePropertyName 'TimeParameterDay' -NotePropertyValue $timeParameterDay
+        $btvJob | Add-member -NotePropertyName 'Channel' -NotePropertyValue $channel
+        $btvJob | Add-member -NotePropertyName 'StationNumber' -NotePropertyValue $channel
+    }
+    $btvJob | Add-member -NotePropertyName 'DisplayedChannelID' -NotePropertyValue $btvJob.StationNumber
+    $btvJob
+}
+
+function Add-BTVRecordingJob {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline)][PSObject]$recordingJob,
+        [Parameter(Mandatory=$false)][int]$highestPriority = 0
+    )
+    $uri = $beyondTV.serverURL + "/BTVScheduler.asmx"
+    $BTVScheduler = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    $jobBag = New-Object $($BTVScheduler.getType().namespace + ".PVSPropertyBag")
+    $jobProperties = $recordingJob.PSObject.Properties
+    foreach ( $property in $jobProperties ) {
+        $bagProperty = New-Object $($BTVScheduler.getType().namespace + ".PVSProperty")
+        $bagProperty.Name = $property.Name
+        $bagProperty.Value = $property.Value
+        $jobBag.Properties += $bagProperty
+    }
+    $BTVScheduler.AddRecordingJob($ticket,$jobBag,$highestPriority)
 }
 
 $beyondTV = [ordered]@{
@@ -444,6 +564,7 @@ if ($registryKey -eq $null) {
         $beyondTV.apiPassword = ''
     }
     $beyondTV.authTicket = $registryKey.authTicket
+    $beyondTV.licenseKey = $registryKey.licenseKey
     $beyondTV.apiUser = $registryKey.apiUser
     $beyondTV.expires = [DateTime]::$registryKey.expires
     $beyondTV.expiry = $registryKey.expiry
