@@ -1,5 +1,5 @@
-list titles of movies in all subcatagories
-Find-BTVSeriesByCatagory -catagory movies | fl SeriesDisplayTitle
+produce alphabetical list of movie titles in all movie subcatagories
+(Find-BTVSeriesByCatagory -catagory movies).SeriesDisplayTitle | Sort-Object
 
 Get UniqueChannelID for station with callsign "AMC"
 (Get-BTVUnifiedLineup | where {$_.StationName -eq 'AMC'}).UniqueChannelID
