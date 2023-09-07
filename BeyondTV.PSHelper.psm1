@@ -303,12 +303,17 @@ function Get-BTVEpisodesByStationAndTime {
         }
     } else {
         $episodes = $btvGuideData.GetEpisodesByStationAndTimeRanges($ticket,$uniqueChannelIDStart,$uniqueChannelIDEnd,$timeStart,$timeEnd)
+        $availableChannels = Get-BTVUnifiedLineup | where {$_.Display -eq 'TRUE'}
         foreach ($episodeBag in $episodes) {
             $episode = New-Object PSObject
             foreach ($property in $episodeBag.properties) {
                 $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
             }
-            $episode
+            $channel = $availableChannels | Where {$_.StationCallSign -eq $episode.StationCallSign}
+            if ($channel) {
+                $episode | Add-member -NotePropertyName DisplayedChannelId -NotePropertyValue $channel.DisplayedChannelId
+                $episode
+            }
         }
     }
 }
