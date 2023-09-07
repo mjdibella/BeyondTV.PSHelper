@@ -246,12 +246,70 @@ function Get-BTVSeries {
     $ticket = Get-BTVAuthTicket
     $allSeries = $BTVLibrary.GetSeries($ticket)
     foreach ($seriesBag in $allSeries) {
-        
         $series = New-Object PSObject
         foreach ($property in $seriesBag.properties) {
            $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
         }
         $series
+    }
+}
+
+function Get-BTVUniqueStationIDExtents {
+    $uniqueChannelIDs = (Get-BTVUnifiedLineup).UniqueChannelID | Sort
+    $uniqueStationIDExtents = New-Object PSObject
+    $uniqueStationIDExtents | Add-member -NotePropertyName uniqueChannelIDStart -NotePropertyValue $($uniqueChannelIDs | Select-Object -First 1)
+    $uniqueStationIDExtents | Add-member -NotePropertyName uniqueChannelIDEnd -NotePropertyValue $($uniqueChannelIDs | Select-Object -Last 1)
+    $uniqueStationIDExtents
+}
+
+function Get-BTVEpisodesByStationAndTime {
+    [CmdletBinding(DefaultParameterSetName='byChannelID')]
+    param(
+        [Parameter(Mandatory=$false,ParameterSetName='byChannelID')][string]$uniqueChannelIDStart,
+        [Parameter(Mandatory=$false,ParameterSetName='byChannelID')][string]$uniqueChannelIDEnd,
+        [Parameter(Mandatory=$false,ParameterSetName='byCallSign')][string]$stationCallSign,
+        [Parameter(Mandatory=$false)][string]$timeStart,
+        [Parameter(Mandatory=$false)][string]$timeEnd
+    )
+    if ((-not $uniqueChannelIDStart) -or (-not $uniqueChannelIDEnd)) {
+        $uniqueChannelIDExtents = Get-BTVUniqueStationIDExtents
+        if (-not $uniqueChannelIDStart) {
+            $uniqueChannelIDStart = $uniqueChannelIDExtents.uniqueChannelIDStart
+        }
+        if (-not $uniqueChannelIDEnd) {
+            $uniqueChannelIDEnd = $uniqueChannelIDExtents.uniqueChannelIDEnd
+        }
+    }
+    if (-not $timeStart) {
+        $timeStart = (Get-Date).ToFileTime()
+    }
+    if (-not $timeEnd) {
+        $timeEnd = (Get-Date).ToFileTime()
+    }
+    $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
+    $btvGuideData = New-WebServiceProxy -Uri $uri
+    $ticket = Get-BTVAuthTicket
+    if ($stationCallSign) {
+        $uniqueChannelIDs = (Get-BTVUnifiedLineup | where {$_.StationCallSign -eq $stationCallSign}).UniqueChannelID  
+        foreach ($uniqueChannelID in $uniqueChannelIDs) {
+            $episodes = $btvGuideData.GetEpisodesByStationAndTimeRanges($ticket,$uniqueChannelID,$uniqueChannelID,$timeStart,$timeEnd)
+            foreach ($episodeBag in $episodes) {
+                $episode = New-Object PSObject
+                foreach ($property in $episodeBag.properties) {
+                    $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+                }
+                $episode
+            }
+        }
+    } else {
+        $episodes = $btvGuideData.GetEpisodesByStationAndTimeRanges($ticket,$uniqueChannelIDStart,$uniqueChannelIDEnd,$timeStart,$timeEnd)
+        foreach ($episodeBag in $episodes) {
+            $episode = New-Object PSObject
+            foreach ($property in $episodeBag.properties) {
+                $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
+            }
+            $episode
+        }
     }
 }
 
