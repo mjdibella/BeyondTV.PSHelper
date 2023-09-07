@@ -309,7 +309,7 @@ function Get-BTVEpisodesByStationAndTime {
             foreach ($property in $episodeBag.properties) {
                 $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
             }
-            $channel = $availableChannels | Where {$_.StationCallSign -eq $episode.StationCallSign}
+            $channel = $availableChannels | Where {$_.UniqueChannelID -eq $episode.UniqueChannelID}
             if ($channel) {
                 $episode | Add-member -NotePropertyName DisplayedChannelId -NotePropertyValue $channel.DisplayedChannelId
                 $episode
