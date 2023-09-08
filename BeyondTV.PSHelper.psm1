@@ -262,7 +262,7 @@ function Get-BTVUniqueStationIDExtents {
     $uniqueStationIDExtents
 }
 
-function Get-BTVEpisodesByStationAndTime {
+function Find-BTVEpisodesByStationAndTime {
     [CmdletBinding(DefaultParameterSetName='byChannelID')]
     param(
         [Parameter(Mandatory=$false,ParameterSetName='byChannelID')][string]$uniqueChannelIDStart,

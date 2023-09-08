@@ -8,4 +8,4 @@ Schedule a recording job for series "Star trek"
 Find-BTVSeriesByKeyword -keywords "Star Trek" | where {$_.SeriesTitle -eq "Star Trek"} | Select-Object -first 1 | New-BTVRecordingJob -rules EPG -epgRepeat ALWAYS | Add-BTVRecordingJob -highestPriority 1
 
 Get a list of all recordable episodes playing now for genre 'Science Fiction'
-Get-BTVEpisodesByStationAndTime | where {$_.Genre -like '*Science Fiction*'} | ft StationCallSign,DisplayedChannelId,SeriesTitle,DisplayTitle,EpisodeTitle -autosize
+Find-BTVEpisodesByStationAndTime | where {$_.Genre -like '*Science Fiction*'} | ft StationCallSign,DisplayedChannelId,SeriesTitle,DisplayTitle,EpisodeTitle -autosize
