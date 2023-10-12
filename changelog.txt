@@ -1,0 +1,3 @@
+Date,Version,By,Description
+2023-10-12  1.0.1  MJD  Added manifest
+2023-10-12  1.0.1  MJD  Find-BTV* cmdlets, except when scoped to a specified channel/station, automatically filter results to include on series/episodes on unhidden channels.
