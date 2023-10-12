@@ -326,12 +326,17 @@ function Find-BTVEpisodesByKeyword {
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
     $episodes = $btvGuideData.GetEpisodesByKeyword($ticket,$keywords)
+    $availableChannels = Get-BTVUnifiedLineup | where {$_.Display -eq 'TRUE'}
     foreach ($episodeBag in $episodes) {
         $episode = New-Object PSObject
         foreach ($property in $episodeBag.properties) {
             $episode | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
         }
-        $episode
+        $channel = $availableChannels | Where {$_.UniqueChannelID -eq $episode.UniqueChannelID}
+        if ($channel) {
+            $episode | Add-member -NotePropertyName DisplayedChannelId -NotePropertyValue $channel.DisplayedChannelId
+            $episode
+        }
     }
 }
 
@@ -376,6 +381,7 @@ function Find-BTVSeriesByCatagory {
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
+    $availableChannels = Get-BTVUnifiedLineup | where {$_.Display -eq 'TRUE'}
     if ($subCatagory.IsPresent) {
         $allSeries = $btvGuideData.GetSeriesByCategory($ticket,$catagory,$subCatagory)
         foreach ($seriesBag in $allSeries) {
@@ -383,7 +389,11 @@ function Find-BTVSeriesByCatagory {
             foreach ($property in $seriesBag.properties) {
                 $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
             }
-            $series
+            $channel = $availableChannels | Where {$_.UniqueChannelID -eq $series.UniqueChannelID}
+            if ($channel) {
+                $series | Add-member -NotePropertyName DisplayedChannelId -NotePropertyValue $channel.DisplayedChannelId
+                $series
+            }
         }
     } else {
         $subCatagories = (Get-BTVGuideCatagories -topCatagory $catagory).Category | where {$_ -ne ''}
@@ -394,7 +404,11 @@ function Find-BTVSeriesByCatagory {
                 foreach ($property in $seriesBag.properties) {
                     $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
                 }
-                $series
+                $channel = $availableChannels | Where {$_.UniqueChannelID -eq $series.UniqueChannelID}
+                if ($channel) {
+                    $series | Add-member -NotePropertyName DisplayedChannelId -NotePropertyValue $channel.DisplayedChannelId
+                    $series
+                }
             }
         }
     }
@@ -407,13 +421,18 @@ function Find-BTVSeriesByKeyword {
     $uri = $beyondTV.serverURL + "/BTVGuideData.asmx"
     $btvGuideData = New-WebServiceProxy -Uri $uri
     $ticket = Get-BTVAuthTicket
+    $availableChannels = Get-BTVUnifiedLineup | where {$_.Display -eq 'TRUE'}
     $allSeries = $btvGuideData.GetSeriesByKeyword($ticket,$keywords)
     foreach ($seriesBag in $allSeries) {
         $series = New-Object PSObject
         foreach ($property in $seriesBag.properties) {
             $series | Add-member -NotePropertyName $property.Name -NotePropertyValue $property.Value
         }
-        $series
+        $channel = $availableChannels | Where {$_.UniqueChannelID -eq $series.UniqueChannelID}
+        if ($channel) {
+            $series | Add-member -NotePropertyName DisplayedChannelId -NotePropertyValue $channel.DisplayedChannelId
+            $series
+        }
     }
 }
 
