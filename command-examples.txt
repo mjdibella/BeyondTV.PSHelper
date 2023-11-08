@@ -1,5 +1,8 @@
-Retrieve titles of movies in all subcatagories
+Retrieve unique titles of movies in all subcatagories
 Find-BTVSeriesByCatagory -catagory movies | fl SeriesDisplayTitle
+
+Retrieve all movies broadcasting on station 'TCM' in table format
+Find-BTVSeriesByCatagory -catagory movies | Where {$_.StationCallSign -eq 'TCM'} | Sort SeriesDisplayTitle -Unique | Ft SeriesDisplayTitle,MovieYear,MPAA,Genre -autosize
 
 Retrieve UniqueChannelID for station with callsign "AMC"
 (Get-BTVUnifiedLineup | where {$_.StationName -eq 'AMC'}).UniqueChannelID
@@ -14,4 +17,4 @@ Retrieve the start time and episode names of Star Trek episodes in table format
 Find-BTVEpisodesByKeyword -keyword 'Star Trek' | Where {$_.SeriesTitle -eq 'Star Trek'} | Ft @{Expr={[DateTime]::FromFileTime($_.Start)};Label="Start"},DisplayedChannelId,StationCallSign,EpisodeTitle -autosize
 
 Retrieve upcoming first-run Warriors Basketball games in list format with formatted dates
-Find-BTVEpisodesByKeyword -keywords 'Warriors' | Where {($_.SeriesTitle -eq 'NBA Basketball') -and ($([DateTime]::ParseExact($_.OriginalAirDate,"yyyyMMdd", $null)).Date -eq $([DateTime]::FromFileTime($_.Start)).Date)}  | Fl @{Expr={$([DateTime]::FromFileTime($_.Start)).ToString("ddd MMM dd, yyyy hh:mm tt")};Label="StartTime"},DisplayedChannelId,StationCallSign,EpisodeTitle,SeriesTitle,EpisodeTitle,EpisodeDescription,Genre,@{Expr={$([DateTime]::ParseExact($_.OriginalAirDate, "yyyyMMdd", $null)).ToString("ddd MMM dd, yyyy")};Label="OriginalAirDate"}
+Find-BTVEpisodesByKeyword -keywords 'Warriors' | Where {($_.SeriesTitle -eq 'NBA Basketball') -and ($([DateTime]::ParseExact($_.OriginalAirDate,"yyyyMMdd", $null)).Date -eq $([DateTime]::FromFileTime($_.Start)).Date)}  | Fl @{Expr={$([DateTime]::FromFileTime($_.Start)).ToString("ddd MMM dd, yyyy hh:mm tt")};Label="StartTime"},DisplayedChannelId,StationCallSign,SeriesTitle,EpisodeTitle,EpisodeDescription,Genre,@{Expr={$([DateTime]::ParseExact($_.OriginalAirDate, "yyyyMMdd", $null)).ToString("ddd MMM dd, yyyy")};Label="OriginalAirDate"}
